@@ -194,14 +194,14 @@ void MotorCommon_t::update(void *param)
 void MotorCommon_t::pwm_out(int pwm)
 {
     int out_speed = pwm;
-    if (out_speed > 0)
+    if (out_speed < 0)
     {
-        __HAL_TIM_SetCompare(_TIM, _channel, out_speed);
+        __HAL_TIM_SetCompare(_TIM, _channel, -out_speed);
         HAL_GPIO_WritePin(_PH_Port, _PH_Pin, GPIO_PIN_SET);
     }
     else
     {
-        __HAL_TIM_SetCompare(_TIM, _channel, -out_speed);
+        __HAL_TIM_SetCompare(_TIM, _channel, out_speed);
         HAL_GPIO_WritePin(_PH_Port, _PH_Pin, GPIO_PIN_RESET);
     }
 }

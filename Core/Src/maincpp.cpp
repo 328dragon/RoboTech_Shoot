@@ -9,6 +9,8 @@
  * Copyright (c) 2024 by ${git_name_email}, All Rights Reserved.
  */
 __asm(".global __use_no_semihosting");
+//#define debug_chassis 1 
+
 #include "maincpp.h"
 #include "Eigen"
 #include "controller.h"
@@ -67,8 +69,12 @@ void once_loop(Map::MapInfo_t *map);
 /*二与三需要实时更新*/
 void main_cpp(void)
 {
-  MotorList.Add(new Motor::MotorCommon_t(&htim8, TIM_CHANNEL_2, Motor2_PH_GPIO_Port, Motor2_PH_Pin, &htim2, -1, 0));
-  MotorList.Add(new Motor::MotorCommon_t(&htim8, TIM_CHANNEL_4, Motor4_PH_GPIO_Port, Motor4_PH_Pin, &htim4, 1, 1));
+  // MotorList.Add(new Motor::MotorCommon_t(&htim8, TIM_CHANNEL_2, Motor2_PH_GPIO_Port, Motor2_PH_Pin, &htim2, -1, 0));
+  // MotorList.Add(new Motor::MotorCommon_t(&htim8, TIM_CHANNEL_4, Motor4_PH_GPIO_Port, Motor4_PH_Pin, &htim4, 1, 1));
+  // MotorList.Add(new Motor::MotorCommon_t(&htim8, TIM_CHANNEL_1, Motor1_PH_GPIO_Port, Motor1_PH_Pin, &htim1, -1, 2));
+  // MotorList.Add(new Motor::MotorCommon_t(&htim8, TIM_CHANNEL_3, Motor3_PH_GPIO_Port, Motor3_PH_Pin, &htim3, 1, 3));
+   MotorList.Add(new Motor::MotorCommon_t(&htim8, TIM_CHANNEL_2, Motor2_PH_GPIO_Port, Motor2_PH_Pin, &htim2, 1, 1));
+  MotorList.Add(new Motor::MotorCommon_t(&htim8, TIM_CHANNEL_4, Motor4_PH_GPIO_Port, Motor4_PH_Pin, &htim4, -1, 0));
   MotorList.Add(new Motor::MotorCommon_t(&htim8, TIM_CHANNEL_1, Motor1_PH_GPIO_Port, Motor1_PH_Pin, &htim1, -1, 2));
   MotorList.Add(new Motor::MotorCommon_t(&htim8, TIM_CHANNEL_3, Motor3_PH_GPIO_Port, Motor3_PH_Pin, &htim3, 1, 3));
   //车长30，车宽20
@@ -131,7 +137,8 @@ void main_cpp(void)
 
 void Onmaincpp(void *pvParameters)
 {
-  static bool first = true;
+  #ifndef debug_chassis
+    
 //  while (host.task_id == -1)
 //  {
 //    vTaskDelay(100);
@@ -176,6 +183,16 @@ void Onmaincpp(void *pvParameters)
 //   }
 
   ChassisControl.set_vel_target({0, 0, 0});
+
+  #else //debug模式
+//	ChassisControl.set_vel_target({0, 0,0.5});
+auto &state = planner.LoactaionCloseControl({0, 0,0},0.8, {0.01, 0.01, 0.02});
+  while (state.isResolved() == false)
+  {
+    vTaskDelay(50);
+  }
+
+  #endif // !debug_chassis
 
   while (1)
   {
