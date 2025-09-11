@@ -132,10 +132,10 @@ void main_cpp(void)
 void Onmaincpp(void *pvParameters)
 {
   static bool first = true;
-  while (host.task_id == -1)
-  {
-    vTaskDelay(100);
-  }
+//  while (host.task_id == -1)
+//  {
+//    vTaskDelay(100);
+//  }
   host.task_id=0;//测试用
   choice_task(host.task_id);
 
