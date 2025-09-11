@@ -182,6 +182,7 @@ PA13.Signal=SYS_JTMS-SWDIO
 PA14.Mode=Serial_Wire
 PA14.Signal=SYS_JTCK-SWCLK
 PA2.Signal=S_TIM5_CH3
+PA3.Locked=true
 PA3.Signal=S_TIM5_CH4
 PA6.Signal=S_TIM3_CH1
 PA7.Signal=S_TIM3_CH2
