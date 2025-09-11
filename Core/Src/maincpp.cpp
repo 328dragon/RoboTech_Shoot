@@ -1,0 +1,417 @@
+/*
+ * @Author: Elaina
+ * @Date: 2024-08-17 21:13:10
+ * @LastEditors: chaffer-cold 1463967532@qq.com
+ * @LastEditTime: 2024-10-18 23:09:14
+ * @FilePath: \MDK-ARMg:\project\stm32\f405rgb6\08_guosai\Core\Src\maincpp.cpp
+ * @Description:
+ *
+ * Copyright (c) 2024 by ${git_name_email}, All Rights Reserved.
+ */
+__asm(".global __use_no_semihosting");
+#include "maincpp.h"
+#include "Eigen"
+#include "controller.h"
+#include "Lib_List.h"
+#include "connect.h"
+#include "planner.h"
+#include "map.h"
+#include "grasycalse_planner.h"
+#include "imu.h"
+#include "WS2812_yx.h"
+#define PI 3.1415926535
+// Motor::MotorCommon_t MotorPwm[4];
+int flaga = 0;
+int flagb = 0;
+extern "C"
+{
+  extern UART_HandleTypeDef huart2;
+}
+// 实例化Map并将初始点设置成startInfo
+Controller::Controller_t ChassisControl;
+Kinematic::Kinematic_t kinematic;
+Connect::Host_t host;
+Planner::Planner_t planner;
+Grayscale_t Grayscale;
+IMU::IMU_t imu;
+TaskHandle_t Motor_control_handle;    // 电机转速控制
+TaskHandle_t Kinematic_update_handle; // 运动学更新
+TaskHandle_t main_cpp_handle;         // 主函数
+TaskHandle_t Planner_update_handle;   // 轨迹规划
+List::List_t<Motor::MotorCommon_t *> MotorList;
+List::List_t<Map::MapInfo_t *> MapList;
+PwmOut_t pwm[3];
+void OnMotorControl(void *pvParameters);
+void OnKinematicUpdate(void *pvParameters);
+void Onmaincpp(void *pvParameters);
+void OnPlannerUpdate(void *pvParameters);
+void ball_down();
+void choice_task(uint8_t id);
+void ball_up();
+void shoot_ready();
+void shootdown();
+void once_loop(Map::MapInfo_t *map);
+// 现在有三种控制方法
+/*一是基于自身坐标系下的速度闭环*/
+/*二是基于大地坐标系下的速度闭环*/
+/*三是基于自身坐标系下的位置闭环*/
+/*一只要一开始给一个控制量*/
+/*二与三需要实时更新*/
+void main_cpp(void)
+{
+  MotorList.Add(new Motor::MotorCommon_t(&htim8, TIM_CHANNEL_2, Motor2_PH_GPIO_Port, Motor2_PH_Pin, &htim2, -1, 0));
+  MotorList.Add(new Motor::MotorCommon_t(&htim8, TIM_CHANNEL_4, Motor4_PH_GPIO_Port, Motor4_PH_Pin, &htim4, 1, 1));
+  MotorList.Add(new Motor::MotorCommon_t(&htim8, TIM_CHANNEL_1, Motor1_PH_GPIO_Port, Motor1_PH_Pin, &htim1, -1, 2));
+  MotorList.Add(new Motor::MotorCommon_t(&htim8, TIM_CHANNEL_3, Motor3_PH_GPIO_Port, Motor3_PH_Pin, &htim3, 1, 3));
+  ChassisControl = Controller::Controller_t(reinterpret_cast<List::List_t<Motor::IMotorSpeed_t *> *>(&MotorList), &kinematic);
+  planner = Planner::Planner_t(&ChassisControl);
+  host = Connect::Host_t(&huart2, &ChassisControl, &planner);
+//  Grayscale = Grayscale_t({{Grayscale1_GPIO_Port, Grayscale2_GPIO_Port, Grayscale3_GPIO_Port, Grayscale4_GPIO_Port, Grayscale5_GPIO_Port, Grayscale6_GPIO_Port, Grayscale7_GPIO_Port},
+//                           {Grayscale1_Pin, Grayscale2_Pin, Grayscale3_Pin, Grayscale4_Pin, Grayscale5_Pin, Grayscale6_Pin, Grayscale7_Pin}});
+  // HAL_UART_Receive_DMA(&huart3,imu.buffer,100);
+  pwm[0] = {&htim5, TIM_CHANNEL_1};
+  pwm[1] = {&htim10, TIM_CHANNEL_1};
+  pwm[2] = {&htim11, TIM_CHANNEL_1};
+  pwm[1].set_duty_cycle(5.3);
+  pwm[1].debug = 5.3;
+  WS2812_InitBuffer();
+  WS2812_StateDescription statea = {
+      .state = WS2812_flow,
+      .priority = 1,
+
+      .R = 255,
+      .G = 0,
+      .B = 225,
+  };
+  WS2812_StateDescription WS2812_Empty_State =
+      {
+          .state = WS2812_clear,
+          .priority = 99,
+
+          .R = 0,
+          .G = 0,
+          .B = 0,
+      };
+  WS2812_AddStateLink(&flaga, statea);
+  WS2812_AddStateLink(&flagb, WS2812_Empty_State);
+  HAL_UARTEx_ReceiveToIdle_DMA(&huart3, imu.buffer, 100);
+  BaseType_t ok = xTaskCreate(OnMotorControl, "Motor_control", 600, NULL, 3, &Motor_control_handle);
+  BaseType_t ok2 = xTaskCreate(OnKinematicUpdate, "Kinematic_update", 600, NULL, 2, &Kinematic_update_handle);
+  BaseType_t ok3 = xTaskCreate(Onmaincpp, "main_cpp", 600, NULL, 4, &main_cpp_handle);
+  BaseType_t ok4 = xTaskCreate(OnPlannerUpdate, "Planner_update", 1000, NULL, 4, &Planner_update_handle);
+  if (ok != pdPASS || ok2 != pdPASS || ok3 != pdPASS || ok4 != pdPASS)
+  {
+    while (1)
+    {
+      // uart_printf("create task failed\n");
+    }
+  }
+
+  // RTOS不用while1
+}
+
+void Onmaincpp(void *pvParameters)
+{
+  static bool first = true;
+ while (host.task_id==-1)
+  {
+    vTaskDelay(100);
+  }
+  choice_task(host.task_id);
+  flaga=1;
+  vTaskDelay(100);
+  imu.setzeroyaw();
+  vTaskDelay(100);
+  
+  for (int i = 1; i < 3; i++)
+  {
+    pwm[i].set_duty_cycle(5.0);
+  }
+  for (int i = 0; i < 3; i++)
+  {
+    MapList.Foreach(once_loop);
+  }
+  auto& state=planner.LoactaionCloseControl({-0.15,0,3.1415/2.0},1.6,{0.01,0.01,0.02});
+  while(state.isResolved()==false)
+  {
+    vTaskDelay(50);
+  }
+  flagb = 1;
+
+  // while (Grayscale.IsCurrentMode(OutLine) == false)
+  // {
+  //   ChassisControl.set_vel_target({0.07, 0, Grayscale.ReturnCotorl()});
+  //   vTaskDelay(20);
+  // }
+  // ChassisControl.set_vel_target({0, 0, 0});
+
+  while (1)
+  {
+    vTaskDelay(100);
+  }
+}
+void once_loop(Map::MapInfo_t *map)
+{
+  static bool first = true;
+  Kinematic::odom_t odom = map->odom;
+  if (first)
+  {
+
+    odom.x -= 0.1;
+    first = false;
+  }
+
+  auto &state = planner.LoactaionCloseControl(odom, 1.3, {0.01, 0.005, 0.01});
+
+  while (state.isResolved() == false)
+  {
+    vTaskDelay(50);
+  }
+  while (Grayscale.IsCurrentMode(OutLine) == false)
+  {
+
+    ChassisControl.set_vel_target({0.15, Grayscale.ReturnXControl(), 0});
+    vTaskDelay(20);
+  }
+  ChassisControl.set_vel_target({0, 0, 0});
+  kinematic.current_odom.x = map->odom.x + 0.15;
+  // imu.setzeroyaw();
+  shoot_ready();
+  ball_down();
+  vTaskDelay(700);
+  ball_up();
+  vTaskDelay(700);
+  shootdown();
+}
+void ball_down()
+{
+  pwm[0].set_duty_cycle(7.6);
+}
+void ball_up()
+{
+  pwm[0].set_duty_cycle(12.6);
+}
+void shoot_ready()
+{
+  for (int i = 1; i < 3; i++)
+  {
+    pwm[i].set_duty_cycle(6.85);
+  }
+}
+void shootdown()
+{
+  for (int i = 1; i < 3; i++)
+  {
+    pwm[i].set_duty_cycle(5.8);
+  }
+}
+
+void OnMotorControl(void *pvParameters)
+{
+  uint16_t last_tick = 0;
+  while (1)
+  {
+    // 通过任务通知机制获取电机控制速度
+    uint16_t dt = (uint16_t)((xTaskGetTickCount() - last_tick) % portMAX_DELAY);
+    last_tick = xTaskGetTickCount();
+    // 为了防止第一次出错
+    if (dt == 0)
+    {
+      continue;
+    }
+    ChassisControl.MotorUpdate(dt);
+    vTaskDelay(3);
+  }
+}
+
+void choice_task(uint8_t id)
+{
+  switch (id)
+  {
+  case 0:
+    MapList.Add(&Map::MapLeft);
+    MapList.Add(&Map::MapRight);
+    MapList.Add(&Map::MapMide);
+    
+    break;
+  case 1:
+    MapList.Add(&Map::MapLeft);
+    MapList.Add(&Map::MapMide);
+    MapList.Add(&Map::MapRight);
+    break;
+  case 2:
+     MapList.Add(&Map::MapMide);
+     MapList.Add(&Map::MapLeft);
+     MapList.Add(&Map::MapRight);
+     break;
+  case 3:
+    MapList.Add(&Map::MapRight);
+    MapList.Add(&Map::MapLeft);
+    MapList.Add(&Map::MapMide);
+    break;
+  case 4:
+    MapList.Add(&Map::MapMide);
+    MapList.Add(&Map::MapRight);
+    MapList.Add(&Map::MapLeft);
+    break;
+  case 5:
+    MapList.Add(&Map::MapRight);
+    MapList.Add(&Map::MapMide);
+    MapList.Add(&Map::MapLeft);
+    break;
+  default:
+    break;
+  }
+}
+
+void OnPlannerUpdate(void *pvParameters)
+{
+  uint16_t last_tick = xTaskGetTickCount();
+  // Kinematic.init(0.6, 2, 0.2); // 初始化运动学模型
+  while (1)
+  {
+    uint16_t dt = (xTaskGetTickCount() - last_tick) % portMAX_DELAY;
+    last_tick = xTaskGetTickCount();
+    planner.update(dt);
+    WS2812_State_Handler();
+    vTaskDelay(50);
+  }
+}
+void OnKinematicUpdate(void *pvParameters)
+{
+  uint16_t last_tick = xTaskGetTickCount();
+
+  while (1)
+  {
+    uint16_t dt = (xTaskGetTickCount() - last_tick) % portMAX_DELAY;
+    last_tick = xTaskGetTickCount();
+    ChassisControl.KinematicAndControlUpdate(dt, imu.getyaw());
+    vTaskDelay(13);
+  }
+}
+
+void MyHAL_UARTECallback()
+{
+  HAL_UARTEx_ReceiveToIdle_DMA(host._huart, host._rx_buffer, 20);
+  HAL_UARTEx_ReceiveToIdle_IT(&huart3, imu.buffer, 100);
+}
+void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
+{
+  // if (huart->Instance == USART2 && __HAL_UART_GET_FLAG(&huart2, UART_FLAG_IDLE))
+  if (huart->Instance == USART2)
+  {
+    host.Data_Analyse(host._rx_buffer);
+  }
+  else if (huart->Instance == USART3)
+  {
+    imu.update();
+    HAL_UARTEx_ReceiveToIdle_DMA(&huart3, imu.buffer, 100);
+  }
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+  if (huart->Instance == USART3)
+  {
+    imu.update();
+    HAL_UART_Receive_DMA(&huart3, imu.buffer, 100);
+  }
+}
+void WS2812_Refresh()
+{
+  HAL_SPI_Transmit_DMA(&hspi1, (uint8_t *)WS2812buf2send, 24 * (LED_Nums + 1));
+}
+extern "C"
+{
+
+#ifdef __MICROLIB
+#include <stdio.h>
+
+  int fputc(int ch, FILE *f)
+  {
+    (void)f;
+    (void)ch;
+
+    return ch;
+  }
+#else
+#include <rt_sys.h>
+
+  FILEHANDLE $Sub$$_sys_open(const char *name, int openmode)
+  {
+    (void)name;
+    (void)openmode;
+    return 0;
+  }
+#endif
+
+  void _sys_exit(int ret)
+  {
+    (void)ret;
+    while (1)
+    {
+    }
+  }
+  void _ttywrch(int ch)
+  {
+    (void)ch;
+  }
+}
+// .............................................'RW#####EEEEEEEEEEEEEEEEEEEEEEEEWW%%%%%%N%%%%%%NW"...........
+// ............................................/W%E$$$$EEEE######EEEEEEEEEEEEEEEE%%@NN@@$@@N%%%%N%]~`........
+// ........................................i}}I&XIIYYXF&R#E$$$$$EEE##EEEEEEEEEEEE$N$#$K1:!YW@N%%%%@N$KY]+";..
+// .....................................!>>li!"~~~'~~~~~!"i/1lIFK#E$$$EEEEEEE$$EEE%I::.....,]E@@@NNN@M$E$R>..
+// ....................................+1"""i>"""""!~''''~~~!!~~!>/]Y&#$$$EEEEWWEEE$F,.......:>IRE$#&I/>'....
+// ...................................;*lX&NM@@NW$#RFIl1i"!~~"">>!~~~!i}Y&#$W$EW%$EEMi...........::...'l1....
+// ]}/+>~,............................,*YRNNNN@@MMMMMMMM@WRF*1>!~"!~!!~~!>+1IK$W%%W%1.................!*+....
+// FFF&K&FYYYI]/"'`....................!K%W$$$$$$$EEEEEEE$W%%%WE&I]+!~~~!">"~~i*#%@#...................';....
+// }}}}}}]l*XR#$WWERXl/!,:........,>>i/YK&&&&KKKKRR##EE$$$$$EEEE$$$EKYl/>!'~!"!+]IRNI..................'':...
+// lllll]]]]}IYYXFK#W%N%$RFl+~`..`X/>>>!~~~~~!!"""">>ii+/}*YXK#EE$$WWWW$#Fl+"'~+**]*FI"................>i....
+// ]]]]]]]]]]YXXXXYYXFRE$WW%%W#FlXl;!">+//i">"~'''''~!""!~~~!""i/1]*YFR#$%%WE&l/1]**lI&!.............>]]ll~..
+// ]]]]]]]]]*XXXXXXXXYYX&R$$EE$$WWRR#WWWWW$E##KXI*1>!~!!""""!!!~~~'~~!!"+}I&R$NNWKYll*E"............"}/,~I&'.
+// ]]]]]]]]lYXXXXXXXXXXXYYXKE$$E#E$$$$$$$$$$$$$$WWW$#X}1+>>""!''''~!!">""""""/]Y#W%$FRY............./+,.~lF>.
+// ]]]]]]]]YXXXXXXXXXXXXXXXYYFKEW$E#EEEEEEEEEEEEEEEE$$WWW$$E#RFYl/+i!''!>"!!~!i]]]*XR#1'............!I/!]XI`.
+// ]]]]]]]IXXXXXXXXXXXXXXXXXXYYYFE%WEEEEEEEEEEEEEEEEEEEEEEE$$$%%NN%$EKY]+i"!!"ilII*l]lXK/.:..........;+1/>:..
+// ]]]]]]IXYXXXXXXXYYYYXXXXXXXYYR$RK$%$EEEEEEEEEEEEEEEEEEEEEEEE##EE$%NNNWE#R&&XI**llll]Y*.......::`,,`:::....
+// ]]]]]*XXXXXXXXXXYYYYYYYXXXY&$#I/>/YE%$EEEEEEEEEEEEEEEEEEEEEEEEEEEE#EE$$WW$$W$ER&Y**]&}~+]IFRE$WW%%%%W$$#KX
+// ]]]]lYXXXXXXXYYYYYYYYYYXXYK#I/ii+i>lYKWWEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE$$WW$$#@%NMMM@@NNNN%%NNNNNN@@
+// ]]]]YXXXXXXYYYYYYYYYYYXYYKX1iiiii+l1>i}KWWE#EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE$W%@N%%%%%%%%%%%%%%%%%%%
+// ]]]*XXXXXXXXXXXXYYYYYXYY&*++iiii+]+>++>11X$%$EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE$%N@@NNNN%%%%%%NNN%%
+// ]]]YXXXXXXXYYYYYYXXYXYX&}i+iiiii1+iiii+*>>+*RWWEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE$%N%W$$$$$$$$$WW%%
+// ]]*XXYYYYYXX&K#$&YXXXXK}>+iiiii++iiii+FI>+i>>}F$W$EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE
+// }}IYYXFK#E%N%%NEYXXXYK}>iiiiiiiiii+>1I}]>iiii>"+*R$W$EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE
+// &XK#EWN@@%#YWN$YYXXY&l>iiiiii++iii>}I"il>iiiiiii"+1IR$$EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE
+// $NN@N$&}!`.*NWXYXXYFI1/ii++i"!i>+>}l"!i]"iiiiiiii/i>/1IEW$$EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE
+// "Y&l>,.:~1F@%KYXXXXF}Yi+i"',.';:,1]"+!'/;i">iiii>/i/1"1]IIX#$$$EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE
+// ......*@M@%RFIYYXYF1F}!'`::::!`."]""~'!]~"":~"iii/i}/+F***>i*YF#E$$EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE
+// ......`+FWNWERFXYXl+Y`::::::,".!}~,:.:.~',*:::,'!+/}!/]!>l/"}X>i1lXRE$$$EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE
+// .........;/XEN@N%Wi&].`:::`:!',]/1i~,::`>`}>.`::.~1""1;::~1"+]li">>/llXRE$$$$$EE##EEEEEEEEEEEEEEE####EEEE$
+// ............:'+lFK}N+:`:::`:!!&%NW$W$&]~,'!/~.``.~!.!''>+/IY>]lX/""11>ii+1lY&#$WWWW$$$$$E$$$$$$$WWW%%%W$#&
+// .................>i~~,`:::`,}#M#}"'F%$W$}`;'!;.:`,','1XFK@@@RF@@@&~~~,!>ii>>+i/}lIXF&KR#$R#RRRKK&XIl1i!'`.
+// ................`+'.~'`::`:`}$X`.::"&KFK&,:`'~!:`,'`~!;.;X&FKK$&l##l'::`;!>+/+i>>>>>>ii>I!.:..............
+// ...:;..`!/:.....;i;."!`::`:;I+~.:.!E&FW#K':'',!"''';...;lYR#K&#K;"1#]~`::,:>i~i++++iii/}++................
+// ...;Y.;/Y`......'>;.>+,::`.~E]:::.'K/"l}i`:`:::`;;'!;`.iK/}%&lRI.`1*'``:,,:+"~,,~"i++i1#+},...............
+// ...:,>/.......~"'.;l;:``:'Y]'```./+~'';::``::::::`,`:~/~~i"!/'.:i;:`:,,:/+;''.::,'!"**>li...............
+// ....:,.;;.......~"':.>i:`:',+l>;'';'";;,``:`:::::::::`,`'~~~~+":`~~```;;'>li!;`::::,.`Xi.1l`..............
+// .......'];......`i;;.:I'::'I>1>'~~'';;,,```::::::::```,;;''~~''~~'`,'>>>>'/"~`,::::,`,X".`l+..............
+// ........~~......."'~`/>+:::lll";'';;;,,,``:``;~::::```,;;'''~!>>"!!>ii!;:,~,'+!::::`;,Y~..,Y'.....::......
+// .......:,.........!~/!.~+`.>]*>:,,,,,,````:`;;;`::````,,,,;;;~!'1/"!;`:::!~+]+"`::`:;;*~...~l.....`>,.....
+// ........>..........>i!!++!'`/1Ii`::```````:::::`:::::`````,,,,`'i``:::::;]}/iii,:`::`!*~....>".....`/`....
+// ........,`........;>.'>"~.i++]/ll+'`::::::``````::::::````::..,+```:`:`:"+ii+++':`:`:;Fi.....i`.....;+....
+// ........`,.......`+:~!.;':i++/+i/}}1+>~;`::.....::::::...:,~i]X~`,:`:`:;/+++++1!:`::`.]I.....`"......+;...
+// ........:~......:i,~'..";,ii+/+++++/1}]]}1/i>"!!;,,,,,>}lII**Y>`,:`:;,,/++++/+1+`:::`:,F,.....~,.....'>...
+// ................"~'`..:1,,+i1+++//////}111}}}IY$K">>>!*NFl&X]>,,:`.'~`*]++++//+}':`:``.>1.....:".....'i...
+// ...............~i':...!1.'+//+++//+/+]l+1]lIF]/Kl"">>+11>"1&i``::`!~;]I]++++//i1i:`::~;./;.....",....!;...
+// ..............,1;.....]~.~+}++++/+///*]Y&F$Kl+}1!i++}1+i"11'`:::;!~i*]l]+//+/1++/,:`:~i``/.....'".........
+// .............:]~....."}.:"}/+++////i1XRRYF*]lFKY/lI/`;,:"+~!:::,!"l&XYFY++/+/]++/~:`:~+".~i....;/.........
+// .............+>.....`*;::/}++++//+/*#El}FIl*F&X]I*IX+`;1}'i::,~>+FYIX&#%#/++1]i++>:`:~++;.+'...~l.........
+// ............;}......+!.:'l+++++1+/#N@/'i#F1!1]*"l*I*]+"+l}1+i+i>iRRE$$$ENIi+1]++//;::!++":`i.:.1].........
+// ............/~....."i.`.+1i+++/1i*WW&~!1Wi`,+i/]Il>'`:.'I*Y>!>}FE$$EEEE#%*i+}}++1}!:`>+i+,.!~."Ii.........
+// ............]'....'/.`;`1+++++//i&EW*~~YF'>+}]1//i"`.:''.Y+iY#$$EEEEEEEEW]i+}/++/*i`,++i/]::>+*l,.........
+// ...........`l"...`/`:"~'/}/+++//YWEW*!+*+>iiI]]/">>i;,!`.lX$$EEEEEEEEEEEWN*+1++++Y1;'+i+i*+.~l}~..........
+// ...........`l/,..+;.,+'~]*+//+1EW$E$X+1"""iY&i1l>"""ii+`,EWEEEEEEEEEEEEEE$W1++++i*]'>+i++//~.+;...........
+// ............]}/`"".:!+~!I}+//iY%#$$EX1~""iFI*~i1]"">!/]`"%EEEEEEEEEEEEEEE$$1i++++/1"+++++};".!;...........
+// ............'Y/1+.`:>+>/]1+//iXW#E$$**X>+F*/";">]l!"+&%I+WE$$$$$$$E$$WW%N%}i++++/>i+i++++]:;;,>...........
+// .............~l}`::;i+i]i}+/+l@%$$E$&XYYY}!1,.!i>XIYX#N$REWEEEEEEEEEEEEE$N1+/+++/'iiiiii/1.`>:+...........
+// ..............,i::;}i+i],*+++$@$EE$E%&']!~"+;~;>!"*}>$$$$EEE$EEEEEEEEEEE#%Fi//+1~'/i+++il>..>`i`..........
+// ..............';:./]i++}.}li]NEEEE$W$}:i]+i!;~;i>i>,>%F/*$EEWWEEEEEEEEEEEE%Xi+//./+i++++*`..";i`..........
