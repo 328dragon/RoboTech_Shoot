@@ -40,22 +40,25 @@ TaskHandle_t Motor_control_handle;    // 电机转速控制
 TaskHandle_t Kinematic_update_handle; // 运动学更新
 TaskHandle_t main_cpp_handle;         // 主函数
 TaskHandle_t Planner_update_handle;   // 轨迹规划
+TaskHandle_t gray_read_handle;       // 灰度传感器
 List::List_t<Motor::MotorCommon_t *> MotorList;
 List::List_t<Map::MapInfo_t *> MapList;
 PwmOut_t pwm[3];
 SoftPwmChannel soft_pwm_fireball;
 SoftPwmChannel *soft_pwm_fire = &soft_pwm_fireball;
-
+GW_grasycalse::Gw_Grayscale_t Gw_GrayscaleSensor;
 void OnMotorControl(void *pvParameters);
 void OnKinematicUpdate(void *pvParameters);
 void Onmaincpp(void *pvParameters);
 void OnPlannerUpdate(void *pvParameters);
+void gray_read_task(void *pvParameters);
 void ball_down();
 void choice_task(uint8_t id);
 void ball_up();
 void shoot_ready();
 void shootdown();
 void once_loop(Map::MapInfo_t *map);
+
 // 现在有三种控制方法
 /*一是基于自身坐标系下的速度闭环*/
 /*二是基于大地坐标系下的速度闭环*/
@@ -75,7 +78,7 @@ void main_cpp(void)
 //  Grayscale = Grayscale_t({{Grayscale1_GPIO_Port, Grayscale2_GPIO_Port, Grayscale3_GPIO_Port, Grayscale4_GPIO_Port, Grayscale5_GPIO_Port, Grayscale6_GPIO_Port, Grayscale7_GPIO_Port},
 //                           {Grayscale1_Pin, Grayscale2_Pin, Grayscale3_Pin, Grayscale4_Pin, Grayscale5_Pin, Grayscale6_Pin, Grayscale7_Pin}});
 
-
+Gw_GrayscaleSensor=GW_grasycalse::Gw_Grayscale_t(&hi2c1, GW_GRAY_ADDR_DEF);
 
   //pwm设置
 //pwm[0] = {&htim5, TIM_CHANNEL_1};
@@ -113,7 +116,8 @@ SoftPwmRegister(soft_pwm_fire, GPIOB, GPIO_PIN_2, 20, 180);//周期20ms,最大�
   BaseType_t ok2 = xTaskCreate(OnKinematicUpdate, "Kinematic_update", 600, NULL, 2, &Kinematic_update_handle);
   BaseType_t ok3 = xTaskCreate(Onmaincpp, "main_cpp", 600, NULL, 4, &main_cpp_handle);
   BaseType_t ok4 = xTaskCreate(OnPlannerUpdate, "Planner_update", 1000, NULL, 4, &Planner_update_handle);
-  if (ok != pdPASS || ok2 != pdPASS || ok3 != pdPASS || ok4 != pdPASS)
+	BaseType_t ok5 = xTaskCreate(gray_read_task, "gray_read_task", 300, NULL, 2, &gray_read_handle);
+  if (ok != pdPASS || ok2 != pdPASS || ok3 != pdPASS || ok4 != pdPASS||ok5!=pdPASS)
   {
     while (1)
     {
@@ -158,6 +162,13 @@ void Onmaincpp(void *pvParameters)
   //   vTaskDelay(20);
   // }
   // ChassisControl.set_vel_target({0, 0, 0});
+while (Gw_GrayscaleSensor.IsCurrentMode(GW_grasycalse::OutLine) == false)
+  {
+    ChassisControl.set_vel_target({0.07, 0, Gw_GrayscaleSensor.ReturnCotorl()});
+    vTaskDelay(20);
+  }
+  ChassisControl.set_vel_target({0, 0, 0});
+
 
   while (1)
   {
@@ -165,6 +176,20 @@ void Onmaincpp(void *pvParameters)
   }
 }
 
+void gray_read_task(void *pvParameters)
+{
+while (Gw_GrayscaleSensor.gw_ping())
+{
+  vTaskDelay(100);
+}
+while (1)
+{
+Gw_GrayscaleSensor.read_data();
+ vTaskDelay(10);
+}
+
+
+}
 void once_loop(Map::MapInfo_t *map)
 {
   static bool first = true;
@@ -182,10 +207,9 @@ void once_loop(Map::MapInfo_t *map)
   {
     vTaskDelay(50);
   }
-  while (Grayscale.IsCurrentMode(OutLine) == false)
+  while (Gw_GrayscaleSensor.IsCurrentMode(GW_grasycalse::OutLine) == false)
   {
-
-    ChassisControl.set_vel_target({0.15, Grayscale.ReturnXControl(), 0});
+    ChassisControl.set_vel_target({0.15, Gw_GrayscaleSensor.ReturnXControl(), 0});
     vTaskDelay(20);
   }
   ChassisControl.set_vel_target({0, 0, 0});
@@ -201,11 +225,11 @@ void once_loop(Map::MapInfo_t *map)
 
 void ball_down()
 {
-  pwm[0].set_duty_cycle(7.6);
+ SoftSetAngle(soft_pwm_fire,0);
 }
 void ball_up()
 {
-  pwm[0].set_duty_cycle(12.6);
+ SoftSetAngle(soft_pwm_fire,90);
 }
 void shoot_ready()
 {
