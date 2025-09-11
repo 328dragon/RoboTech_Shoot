@@ -19,13 +19,15 @@ __asm(".global __use_no_semihosting");
 #include "grasycalse_planner.h"
 #include "imu.h"
 #include "WS2812_yx.h"
+#include "gw_grasycalse.h"
 #define PI 3.1415926535
-// Motor::MotorCommon_t MotorPwm[4];
+
 int flaga = 0;
 int flagb = 0;
 extern "C"
 {
   extern UART_HandleTypeDef huart2;
+	#include "soft_pwm.h"
 }
 // 实例化Map并将初始点设置成startInfo
 Controller::Controller_t ChassisControl;
@@ -41,6 +43,9 @@ TaskHandle_t Planner_update_handle;   // 轨迹规划
 List::List_t<Motor::MotorCommon_t *> MotorList;
 List::List_t<Map::MapInfo_t *> MapList;
 PwmOut_t pwm[3];
+SoftPwmChannel soft_pwm_fireball;
+SoftPwmChannel *soft_pwm_fire = &soft_pwm_fireball;
+
 void OnMotorControl(void *pvParameters);
 void OnKinematicUpdate(void *pvParameters);
 void Onmaincpp(void *pvParameters);
@@ -65,15 +70,22 @@ void main_cpp(void)
   MotorList.Add(new Motor::MotorCommon_t(&htim8, TIM_CHANNEL_3, Motor3_PH_GPIO_Port, Motor3_PH_Pin, &htim3, 1, 3));
   ChassisControl = Controller::Controller_t(reinterpret_cast<List::List_t<Motor::IMotorSpeed_t *> *>(&MotorList), &kinematic);
   planner = Planner::Planner_t(&ChassisControl);
-  host = Connect::Host_t(&huart2, &ChassisControl, &planner);
+  host = Connect::Host_t(&huart4, &ChassisControl, &planner);
+  //灰度
 //  Grayscale = Grayscale_t({{Grayscale1_GPIO_Port, Grayscale2_GPIO_Port, Grayscale3_GPIO_Port, Grayscale4_GPIO_Port, Grayscale5_GPIO_Port, Grayscale6_GPIO_Port, Grayscale7_GPIO_Port},
 //                           {Grayscale1_Pin, Grayscale2_Pin, Grayscale3_Pin, Grayscale4_Pin, Grayscale5_Pin, Grayscale6_Pin, Grayscale7_Pin}});
-  // HAL_UART_Receive_DMA(&huart3,imu.buffer,100);
-  pwm[0] = {&htim5, TIM_CHANNEL_1};
-  pwm[1] = {&htim10, TIM_CHANNEL_1};
-  pwm[2] = {&htim11, TIM_CHANNEL_1};
-  pwm[1].set_duty_cycle(5.3);
-  pwm[1].debug = 5.3;
+
+
+
+  //pwm设置
+//pwm[0] = {&htim5, TIM_CHANNEL_1};
+pwm[1] = {&htim5, TIM_CHANNEL_3};
+pwm[2] = {&htim5, TIM_CHANNEL_4};
+pwm[1].set_duty_cycle(5.3);
+pwm[1].debug = 5.3;
+HAL_TIM_Base_Start_IT(&htim13);
+SoftPwmRegister(soft_pwm_fire, GPIOB, GPIO_PIN_2, 20, 180);//周期20ms,最大角度180度
+  //灯带
   WS2812_InitBuffer();
   WS2812_StateDescription statea = {
       .state = WS2812_flow,
@@ -94,7 +106,9 @@ void main_cpp(void)
       };
   WS2812_AddStateLink(&flaga, statea);
   WS2812_AddStateLink(&flagb, WS2812_Empty_State);
+  //imu串口接收
   HAL_UARTEx_ReceiveToIdle_DMA(&huart3, imu.buffer, 100);
+  //任务创建
   BaseType_t ok = xTaskCreate(OnMotorControl, "Motor_control", 600, NULL, 3, &Motor_control_handle);
   BaseType_t ok2 = xTaskCreate(OnKinematicUpdate, "Kinematic_update", 600, NULL, 2, &Kinematic_update_handle);
   BaseType_t ok3 = xTaskCreate(Onmaincpp, "main_cpp", 600, NULL, 4, &main_cpp_handle);
@@ -150,6 +164,7 @@ void Onmaincpp(void *pvParameters)
     vTaskDelay(100);
   }
 }
+
 void once_loop(Map::MapInfo_t *map)
 {
   static bool first = true;
@@ -183,6 +198,7 @@ void once_loop(Map::MapInfo_t *map)
   vTaskDelay(700);
   shootdown();
 }
+
 void ball_down()
 {
   pwm[0].set_duty_cycle(7.6);
@@ -206,24 +222,7 @@ void shootdown()
   }
 }
 
-void OnMotorControl(void *pvParameters)
-{
-  uint16_t last_tick = 0;
-  while (1)
-  {
-    // 通过任务通知机制获取电机控制速度
-    uint16_t dt = (uint16_t)((xTaskGetTickCount() - last_tick) % portMAX_DELAY);
-    last_tick = xTaskGetTickCount();
-    // 为了防止第一次出错
-    if (dt == 0)
-    {
-      continue;
-    }
-    ChassisControl.MotorUpdate(dt);
-    vTaskDelay(3);
-  }
-}
-
+//任务选择
 void choice_task(uint8_t id)
 {
   switch (id)
@@ -264,6 +263,28 @@ void choice_task(uint8_t id)
   }
 }
 
+//底层不用动
+void OnMotorControl(void *pvParameters)
+{
+  uint16_t last_tick = 0;
+  while (1)
+  {
+    // 通过任务通知机制获取电机控制速度
+    uint16_t dt = (uint16_t)((xTaskGetTickCount() - last_tick) % portMAX_DELAY);
+    last_tick = xTaskGetTickCount();
+    // 为了防止第一次出错
+    if (dt == 0)
+    {
+      continue;
+    }
+    ChassisControl.MotorUpdate(dt);
+    vTaskDelay(3);
+  }
+}
+
+
+
+
 void OnPlannerUpdate(void *pvParameters)
 {
   uint16_t last_tick = xTaskGetTickCount();
@@ -298,7 +319,7 @@ void MyHAL_UARTECallback()
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
   // if (huart->Instance == USART2 && __HAL_UART_GET_FLAG(&huart2, UART_FLAG_IDLE))
-  if (huart->Instance == USART2)
+  if (huart->Instance == UART4)
   {
     host.Data_Analyse(host._rx_buffer);
   }
@@ -319,7 +340,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 }
 void WS2812_Refresh()
 {
-  HAL_SPI_Transmit_DMA(&hspi1, (uint8_t *)WS2812buf2send, 24 * (LED_Nums + 1));
+  HAL_SPI_Transmit_DMA(&hspi3, (uint8_t *)WS2812buf2send, 24 * (LED_Nums + 1));
 }
 extern "C"
 {

@@ -884,6 +884,21 @@
               <FileType>8</FileType>
               <FilePath>.\Hardware\WS2812_yx.cpp</FilePath>
             </File>
+            <File>
+              <FileName>soft_pwm.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Hardware\soft_pwm.c</FilePath>
+            </File>
+            <File>
+              <FileName>gw_grasycalse.cpp</FileName>
+              <FileType>8</FileType>
+              <FilePath>.\Hardware\gw_grasycalse.cpp</FilePath>
+            </File>
+            <File>
+              <FileName>gw_grasycalse.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Hardware\gw_grasycalse.h</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

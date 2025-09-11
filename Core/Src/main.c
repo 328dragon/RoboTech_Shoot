@@ -25,6 +25,7 @@
 #include "maincpp.h"
 #include <stdarg.h>
 #include "string.h"
+#include "soft_pwm.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -55,7 +56,6 @@ TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim4;
 TIM_HandleTypeDef htim5;
 TIM_HandleTypeDef htim8;
-TIM_HandleTypeDef htim10;
 TIM_HandleTypeDef htim11;
 TIM_HandleTypeDef htim13;
 
@@ -77,7 +77,6 @@ static void MX_TIM3_Init(void);
 static void MX_TIM4_Init(void);
 static void MX_TIM8_Init(void);
 static void MX_TIM5_Init(void);
-static void MX_TIM10_Init(void);
 static void MX_TIM11_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_CAN1_Init(void);
@@ -132,7 +131,6 @@ int main(void)
   MX_TIM4_Init();
   MX_TIM8_Init();
   MX_TIM5_Init();
-  MX_TIM10_Init();
   MX_TIM11_Init();
   MX_USART3_UART_Init();
   MX_CAN1_Init();
@@ -688,37 +686,6 @@ static void MX_TIM8_Init(void)
 }
 
 /**
-  * @brief TIM10 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_TIM10_Init(void)
-{
-
-  /* USER CODE BEGIN TIM10_Init 0 */
-
-  /* USER CODE END TIM10_Init 0 */
-
-  /* USER CODE BEGIN TIM10_Init 1 */
-
-  /* USER CODE END TIM10_Init 1 */
-  htim10.Instance = TIM10;
-  htim10.Init.Prescaler = 3360-1;
-  htim10.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim10.Init.Period = 1000-1;
-  htim10.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim10.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_Base_Init(&htim10) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN TIM10_Init 2 */
-
-  /* USER CODE END TIM10_Init 2 */
-
-}
-
-/**
   * @brief TIM11 Initialization Function
   * @param None
   * @retval None
@@ -954,6 +921,10 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   if (htim->Instance == TIM14)
   {
     HAL_IncTick();
+  }
+	  if (htim->Instance == TIM13) //100us
+  {
+    SoftPwmTimerISR() ;
   }
   /* USER CODE BEGIN Callback 1 */
 

@@ -49,7 +49,8 @@
         "stdexcept": "cpp",
         "streambuf": "cpp",
         "typeinfo": "cpp",
-        "main.h": "c"
+        "main.h": "c",
+        "__config": "cpp"
     },
     "C_Cpp.errorSquiggles": "disabled",
     "ros.distro": "humble"

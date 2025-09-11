@@ -36,17 +36,19 @@ extern "C" {
 
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
-  extern SPI_HandleTypeDef hspi1;
+  extern SPI_HandleTypeDef hspi3;
   extern TIM_HandleTypeDef htim1;
   extern TIM_HandleTypeDef htim2;
   extern TIM_HandleTypeDef htim3;
   extern TIM_HandleTypeDef htim4;
   extern TIM_HandleTypeDef htim5;
   extern TIM_HandleTypeDef htim8;
-  extern TIM_HandleTypeDef htim10;
   extern TIM_HandleTypeDef htim11;
-  extern UART_HandleTypeDef huart2;
+	  extern TIM_HandleTypeDef htim13;
   extern UART_HandleTypeDef huart3;
+	  extern UART_HandleTypeDef huart4;
+		  extern UART_HandleTypeDef huart5;
+extern I2C_HandleTypeDef hi2c1;
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/

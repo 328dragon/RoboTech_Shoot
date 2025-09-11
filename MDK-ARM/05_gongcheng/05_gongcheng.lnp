@@ -44,6 +44,8 @@
 "05_gongcheng\planner.o"
 "05_gongcheng\map.o"
 "05_gongcheng\ws2812_yx.o"
+"05_gongcheng\soft_pwm.o"
+"05_gongcheng\gw_grasycalse.o"
 "05_gongcheng\lib_math.o"
 "05_gongcheng\lib_list.o"
 "05_gongcheng\lib_common.o"
