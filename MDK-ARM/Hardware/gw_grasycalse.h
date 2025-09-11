@@ -6,7 +6,7 @@
 
 
 /* 默认地址 */
-#define GW_GRAY_ADDR_DEF 0x4D
+#define GW_GRAY_ADDR_DEF 0x4C
 //PING命令
 #define GW_GRAY_PING 0xAA
 #define GW_GRAY_PING_OK 0x66
@@ -46,7 +46,7 @@ public:
         Salve_Adress=_Salve_Adress;
         pid.target_update(0);
     }
-    int gw_ping(void );
+    unsigned char gw_ping(void );
     void read_data(void);
     float ReturnXControl(void)
     {

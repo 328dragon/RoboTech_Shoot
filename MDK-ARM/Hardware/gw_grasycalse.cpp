@@ -46,7 +46,7 @@ unsigned char IIC_Anolog_Normalize(I2C_HandleTypeDef *_i2c, unsigned char Salve_
 
 
 // 封装后
-int Gw_Grayscale_t::gw_ping(void)
+unsigned char Gw_Grayscale_t::gw_ping(void)
 {
     unsigned char dat;
     IIC_ReadBytes(I2C_handle, Salve_Adress << 1, GW_GRAY_PING, &dat, 1);

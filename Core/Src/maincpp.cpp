@@ -393,6 +393,8 @@ void MyHAL_UARTECallback()
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
   // if (huart->Instance == USART2 && __HAL_UART_GET_FLAG(&huart2, UART_FLAG_IDLE))
+	
+	
   if (huart->Instance == UART4)
   {
     host.Data_Analyse(host._rx_buffer);
@@ -402,6 +404,8 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
     imu.update();
     HAL_UARTEx_ReceiveToIdle_DMA(&huart3, imu.buffer, 100);
   }
+	
+	
 }
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
