@@ -83,8 +83,8 @@ public:
         case GrasyOnLine:
             return data[3] || data[4];
             break;
-        case OutLine:
-            return data[1] && data[2] && data[3] && data[4] && (data[5]&&data[0])&&data[6];
+        case OutLine://全白线返回0，其他全返回1
+            return data[1] || data[2]|| data[3]|| data[4] || (data[5]||data[0])||data[6];
             break;
         default:
             return false;

@@ -27,7 +27,7 @@ int flagb = 0;
 extern "C"
 {
   extern UART_HandleTypeDef huart2;
-	#include "soft_pwm.h"
+#include "soft_pwm.h"
 }
 // 实例化Map并将初始点设置成startInfo
 Controller::Controller_t ChassisControl;
@@ -40,7 +40,7 @@ TaskHandle_t Motor_control_handle;    // 电机转速控制
 TaskHandle_t Kinematic_update_handle; // 运动学更新
 TaskHandle_t main_cpp_handle;         // 主函数
 TaskHandle_t Planner_update_handle;   // 轨迹规划
-TaskHandle_t gray_read_handle;       // 灰度传感器
+TaskHandle_t gray_read_handle;        // 灰度传感器
 List::List_t<Motor::MotorCommon_t *> MotorList;
 List::List_t<Map::MapInfo_t *> MapList;
 PwmOut_t pwm[3];
@@ -71,24 +71,25 @@ void main_cpp(void)
   MotorList.Add(new Motor::MotorCommon_t(&htim8, TIM_CHANNEL_4, Motor4_PH_GPIO_Port, Motor4_PH_Pin, &htim4, 1, 1));
   MotorList.Add(new Motor::MotorCommon_t(&htim8, TIM_CHANNEL_1, Motor1_PH_GPIO_Port, Motor1_PH_Pin, &htim1, -1, 2));
   MotorList.Add(new Motor::MotorCommon_t(&htim8, TIM_CHANNEL_3, Motor3_PH_GPIO_Port, Motor3_PH_Pin, &htim3, 1, 3));
+  //车长30，车宽20
   ChassisControl = Controller::Controller_t(reinterpret_cast<List::List_t<Motor::IMotorSpeed_t *> *>(&MotorList), &kinematic);
   planner = Planner::Planner_t(&ChassisControl);
   host = Connect::Host_t(&huart4, &ChassisControl, &planner);
-  //灰度
-//  Grayscale = Grayscale_t({{Grayscale1_GPIO_Port, Grayscale2_GPIO_Port, Grayscale3_GPIO_Port, Grayscale4_GPIO_Port, Grayscale5_GPIO_Port, Grayscale6_GPIO_Port, Grayscale7_GPIO_Port},
-//                           {Grayscale1_Pin, Grayscale2_Pin, Grayscale3_Pin, Grayscale4_Pin, Grayscale5_Pin, Grayscale6_Pin, Grayscale7_Pin}});
+  // 灰度
+  //  Grayscale = Grayscale_t({{Grayscale1_GPIO_Port, Grayscale2_GPIO_Port, Grayscale3_GPIO_Port, Grayscale4_GPIO_Port, Grayscale5_GPIO_Port, Grayscale6_GPIO_Port, Grayscale7_GPIO_Port},
+  //                           {Grayscale1_Pin, Grayscale2_Pin, Grayscale3_Pin, Grayscale4_Pin, Grayscale5_Pin, Grayscale6_Pin, Grayscale7_Pin}});
 
-Gw_GrayscaleSensor=GW_grasycalse::Gw_Grayscale_t(&hi2c1, GW_GRAY_ADDR_DEF);
+  Gw_GrayscaleSensor = GW_grasycalse::Gw_Grayscale_t(&hi2c1, GW_GRAY_ADDR_DEF);
 
-  //pwm设置
-//pwm[0] = {&htim5, TIM_CHANNEL_1};
-pwm[1] = {&htim5, TIM_CHANNEL_3};
-pwm[2] = {&htim5, TIM_CHANNEL_4};
-pwm[1].set_duty_cycle(5.3);
-pwm[1].debug = 5.3;
-HAL_TIM_Base_Start_IT(&htim13);
-SoftPwmRegister(soft_pwm_fire, GPIOB, GPIO_PIN_2, 20, 180);//周期20ms,最大角度180度
-  //灯带
+  // pwm设置
+  // pwm[0] = {&htim5, TIM_CHANNEL_1};
+  pwm[1] = {&htim5, TIM_CHANNEL_3};
+  pwm[2] = {&htim5, TIM_CHANNEL_4};
+  pwm[1].set_duty_cycle(5.3);
+  pwm[1].debug = 5.3;
+  HAL_TIM_Base_Start_IT(&htim13);
+  SoftPwmRegister(soft_pwm_fire, GPIOB, GPIO_PIN_2, 20, 180); // 周期20ms,最大角度180度
+  // 灯带
   WS2812_InitBuffer();
   WS2812_StateDescription statea = {
       .state = WS2812_flow,
@@ -109,15 +110,15 @@ SoftPwmRegister(soft_pwm_fire, GPIOB, GPIO_PIN_2, 20, 180);//周期20ms,最大�
       };
   WS2812_AddStateLink(&flaga, statea);
   WS2812_AddStateLink(&flagb, WS2812_Empty_State);
-  //imu串口接收
+  // imu串口接收
   HAL_UARTEx_ReceiveToIdle_DMA(&huart3, imu.buffer, 100);
-  //任务创建
+  // 任务创建
   BaseType_t ok = xTaskCreate(OnMotorControl, "Motor_control", 600, NULL, 3, &Motor_control_handle);
   BaseType_t ok2 = xTaskCreate(OnKinematicUpdate, "Kinematic_update", 600, NULL, 2, &Kinematic_update_handle);
   BaseType_t ok3 = xTaskCreate(Onmaincpp, "main_cpp", 600, NULL, 4, &main_cpp_handle);
   BaseType_t ok4 = xTaskCreate(OnPlannerUpdate, "Planner_update", 1000, NULL, 4, &Planner_update_handle);
-	BaseType_t ok5 = xTaskCreate(gray_read_task, "gray_read_task", 300, NULL, 2, &gray_read_handle);
-  if (ok != pdPASS || ok2 != pdPASS || ok3 != pdPASS || ok4 != pdPASS||ok5!=pdPASS)
+  BaseType_t ok5 = xTaskCreate(gray_read_task, "gray_read_task", 300, NULL, 2, &gray_read_handle);
+  if (ok != pdPASS || ok2 != pdPASS || ok3 != pdPASS || ok4 != pdPASS || ok5 != pdPASS)
   {
     while (1)
     {
@@ -131,44 +132,50 @@ SoftPwmRegister(soft_pwm_fire, GPIOB, GPIO_PIN_2, 20, 180);//周期20ms,最大�
 void Onmaincpp(void *pvParameters)
 {
   static bool first = true;
- while (host.task_id==-1)
+  while (host.task_id == -1)
   {
     vTaskDelay(100);
   }
+  host.task_id=0;//测试用
   choice_task(host.task_id);
-  flaga=1;
+
+  flaga = 1;
   vTaskDelay(100);
   imu.setzeroyaw();
   vTaskDelay(100);
-  
+//动作序列
   for (int i = 1; i < 3; i++)
   {
     pwm[i].set_duty_cycle(5.0);
   }
+
   for (int i = 0; i < 3; i++)
   {
     MapList.Foreach(once_loop);
   }
-  auto& state=planner.LoactaionCloseControl({-0.15,0,3.1415/2.0},1.6,{0.01,0.01,0.02});
-  while(state.isResolved()==false)
+
+//回家
+  auto &state = planner.LoactaionCloseControl({-0.15, 0, 0}, 1.6, {0.01, 0.01, 0.02});
+  while (state.isResolved() == false)
   {
     vTaskDelay(50);
   }
   flagb = 1;
+//   auto &state = planner.LoactaionCloseControl({-0.15, 0, 3.1415 / 2.0}, 1.6, {0.01, 0.01, 0.02});
+//   while (state.isResolved() == false)
+//   {
+//     vTaskDelay(50);
+//   }
+//   flagb = 1;
 
-  // while (Grayscale.IsCurrentMode(OutLine) == false)
-  // {
-  //   ChassisControl.set_vel_target({0.07, 0, Grayscale.ReturnCotorl()});
-  //   vTaskDelay(20);
-  // }
-  // ChassisControl.set_vel_target({0, 0, 0});
-while (Gw_GrayscaleSensor.IsCurrentMode(GW_grasycalse::OutLine) == false)
-  {
-    ChassisControl.set_vel_target({0.07, 0, Gw_GrayscaleSensor.ReturnCotorl()});
-    vTaskDelay(20);
-  }
+// // 最终停下来
+//   while (Gw_GrayscaleSensor.IsCurrentMode(GW_grasycalse::OutLine) == false)
+//   {
+//     ChassisControl.set_vel_target({0.07, 0, Gw_GrayscaleSensor.ReturnCotorl()});
+//     vTaskDelay(20);
+//   }
+
   ChassisControl.set_vel_target({0, 0, 0});
-
 
   while (1)
   {
@@ -178,43 +185,48 @@ while (Gw_GrayscaleSensor.IsCurrentMode(GW_grasycalse::OutLine) == false)
 
 void gray_read_task(void *pvParameters)
 {
-while (Gw_GrayscaleSensor.gw_ping())
-{
-  vTaskDelay(100);
-}
-while (1)
-{
-Gw_GrayscaleSensor.read_data();
- vTaskDelay(10);
+  while (Gw_GrayscaleSensor.gw_ping())
+  {
+    vTaskDelay(100);
+  }
+  while (1)
+  {
+    Gw_GrayscaleSensor.read_data();
+    vTaskDelay(10);
+  }
 }
 
 
-}
 void once_loop(Map::MapInfo_t *map)
 {
-  static bool first = true;
-  Kinematic::odom_t odom = map->odom;
-  if (first)
-  {
-
-    odom.x -= 0.1;
-    first = false;
-  }
-
+  //目标值先减少一段距离(30框的一半+15车身一半+10预留校准跑道)
+   odom.x -= 0.55;
+  //正常情况
   auto &state = planner.LoactaionCloseControl(odom, 1.3, {0.01, 0.005, 0.01});
 
   while (state.isResolved() == false)
   {
     vTaskDelay(50);
   }
-  while (Gw_GrayscaleSensor.IsCurrentMode(GW_grasycalse::OutLine) == false)
+
+  //对准y,当全白时候停止
+  while (Gw_GrayscaleSensor.IsCurrentMode(GW_grasycalse::OutLine))
   {
     ChassisControl.set_vel_target({0.15, Gw_GrayscaleSensor.ReturnXControl(), 0});
     vTaskDelay(20);
   }
   ChassisControl.set_vel_target({0, 0, 0});
-  kinematic.current_odom.x = map->odom.x + 0.15;
+  //更新当前里程计
+  kinematic.current_odom.x = map->odom.x - 0.45;
+//继续跑向目标
+auto &state = planner.LoactaionCloseControl(odom, 1.3, {0.01, 0.005, 0.01});
+
+  while (state.isResolved() == false)
+  {
+    vTaskDelay(50);
+  }
   // imu.setzeroyaw();
+  //发射,不用改
   shoot_ready();
   ball_down();
   vTaskDelay(700);
@@ -223,13 +235,53 @@ void once_loop(Map::MapInfo_t *map)
   shootdown();
 }
 
+// void once_loop(Map::MapInfo_t *map)
+// {
+//   //第一次
+//   static bool first = true;
+
+//   Kinematic::odom_t odom = map->odom;
+//   if (first)
+//   {
+//   //后退一步
+//     odom.x -= 0.1;
+//     first = false;
+//   }
+
+//   //正常情况
+//   auto &state = planner.LoactaionCloseControl(odom, 1.3, {0.01, 0.005, 0.01});
+
+//   while (state.isResolved() == false)
+//   {
+//     vTaskDelay(50);
+//   }
+
+//   //对准y
+//   while (Gw_GrayscaleSensor.IsCurrentMode(GW_grasycalse::OutLine) == false)
+//   {
+//     ChassisControl.set_vel_target({0.15, Gw_GrayscaleSensor.ReturnXControl(), 0});
+//     vTaskDelay(20);
+//   }
+//   ChassisControl.set_vel_target({0, 0, 0});
+//   //更新当前里程计
+//   kinematic.current_odom.x = map->odom.x + 0.15;
+//   // imu.setzeroyaw();
+//   //发射
+//   shoot_ready();
+//   ball_down();
+//   vTaskDelay(700);
+//   ball_up();
+//   vTaskDelay(700);
+//   shootdown();
+// }
+
 void ball_down()
 {
- SoftSetAngle(soft_pwm_fire,0);
+  SoftSetAngle(soft_pwm_fire, 0);
 }
 void ball_up()
 {
- SoftSetAngle(soft_pwm_fire,90);
+  SoftSetAngle(soft_pwm_fire, 90);
 }
 void shoot_ready()
 {
@@ -246,7 +298,7 @@ void shootdown()
   }
 }
 
-//任务选择
+// 任务选择
 void choice_task(uint8_t id)
 {
   switch (id)
@@ -255,7 +307,7 @@ void choice_task(uint8_t id)
     MapList.Add(&Map::MapLeft);
     MapList.Add(&Map::MapRight);
     MapList.Add(&Map::MapMide);
-    
+
     break;
   case 1:
     MapList.Add(&Map::MapLeft);
@@ -263,10 +315,10 @@ void choice_task(uint8_t id)
     MapList.Add(&Map::MapRight);
     break;
   case 2:
-     MapList.Add(&Map::MapMide);
-     MapList.Add(&Map::MapLeft);
-     MapList.Add(&Map::MapRight);
-     break;
+    MapList.Add(&Map::MapMide);
+    MapList.Add(&Map::MapLeft);
+    MapList.Add(&Map::MapRight);
+    break;
   case 3:
     MapList.Add(&Map::MapRight);
     MapList.Add(&Map::MapLeft);
@@ -287,7 +339,7 @@ void choice_task(uint8_t id)
   }
 }
 
-//底层不用动
+// 底层不用动
 void OnMotorControl(void *pvParameters)
 {
   uint16_t last_tick = 0;
@@ -305,9 +357,6 @@ void OnMotorControl(void *pvParameters)
     vTaskDelay(3);
   }
 }
-
-
-
 
 void OnPlannerUpdate(void *pvParameters)
 {
