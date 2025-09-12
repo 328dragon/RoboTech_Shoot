@@ -63,7 +63,7 @@ void ball_up();
 void shoot_ready();
 void shootdown();
 void once_loop(Map::MapInfo_t *map);
-
+int debug_fire_ball=0;
 // 现在有三种控制方法
 /*一是基于自身坐标系下的速度闭环*/
 /*二是基于大地坐标系下的速度闭环*/
@@ -166,7 +166,7 @@ void Onmaincpp(void *pvParameters)
   }
 
 //回家
-  auto &state = planner.LoactaionCloseControl({0, 0, 0}, 1.6, {0.01, 0.01, 0.02});
+  auto &state = planner.LoactaionCloseControl({-0.15, 0.1, 0}, 1.6, {0.01, 0.01, 0.02});
   while (state.isResolved() == false)
   {
     vTaskDelay(50);
@@ -190,16 +190,17 @@ void Onmaincpp(void *pvParameters)
 
   #else //debug模式
 //	ChassisControl.set_vel_target({0, 0,0.5});
-auto &state = planner.LoactaionCloseControl({0, 0,0},0.8, {0.01, 0.01, 0.02});
-  while (state.isResolved() == false)
-  {
-    vTaskDelay(50);
-  }
+//auto &state = planner.LoactaionCloseControl({0, 0,0},0.8, {0.01, 0.01, 0.02});
+//  while (state.isResolved() == false)
+//  {
+//    vTaskDelay(50);
+//  }
 
   #endif // !debug_chassis
 
   while (1)
   {
+		  SoftSetAngle(soft_pwm_fire, debug_fire_ball);
     vTaskDelay(100);
   }
 }
@@ -263,11 +264,11 @@ state = planner.LoactaionCloseControl( map->odom, 1.3, {0.01, 0.005, 0.01});
 
 void ball_down()
 {
-  SoftSetAngle(soft_pwm_fire, 0);
+  SoftSetAngle(soft_pwm_fire, 90);
 }
 void ball_up()
 {
-  SoftSetAngle(soft_pwm_fire, 90);
+  SoftSetAngle(soft_pwm_fire, 120);
 }
 void shoot_ready()
 {
