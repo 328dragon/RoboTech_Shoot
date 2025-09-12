@@ -19,9 +19,11 @@ __asm(".global __use_no_semihosting");
 #include "planner.h"
 #include "map.h"
 #include "grasycalse_planner.h"
-#include "imu.h"
+//#include "imu.h"
+#include "ch040.h"
 #include "WS2812_yx.h"
 #include "gw_grasycalse.h"
+
 #define PI 3.1415926535
 
 int flaga = 0;
@@ -36,8 +38,9 @@ Controller::Controller_t ChassisControl;
 Kinematic::Kinematic_t kinematic;
 Connect::Host_t host;
 Planner::Planner_t planner;
-Grayscale_t Grayscale;
-IMU::IMU_t imu;
+// Grayscale_t Grayscale;
+// IMU::IMU_t imu;
+uint8_t ch040_imu_buffer[100];
 TaskHandle_t Motor_control_handle;    // 电机转速控制
 TaskHandle_t Kinematic_update_handle; // 运动学更新
 TaskHandle_t main_cpp_handle;         // 主函数
@@ -117,7 +120,7 @@ void main_cpp(void)
   WS2812_AddStateLink(&flaga, statea);
   WS2812_AddStateLink(&flagb, WS2812_Empty_State);
   // imu串口接收
-  HAL_UARTEx_ReceiveToIdle_DMA(&huart3, imu.buffer, 100);
+  HAL_UARTEx_ReceiveToIdle_DMA(&huart3,ch040_imu_buffer, 100);
   // 任务创建
   BaseType_t ok = xTaskCreate(OnMotorControl, "Motor_control", 600, NULL, 3, &Motor_control_handle);
   BaseType_t ok2 = xTaskCreate(OnKinematicUpdate, "Kinematic_update", 600, NULL, 2, &Kinematic_update_handle);
@@ -148,7 +151,8 @@ void Onmaincpp(void *pvParameters)
 
   flaga = 1;
   vTaskDelay(100);
-  imu.setzeroyaw();
+//  imu.setzeroyaw();
+	ch040.setYawZero();
   vTaskDelay(100);
 //动作序列
   for (int i = 1; i < 3; i++)
@@ -162,7 +166,7 @@ void Onmaincpp(void *pvParameters)
   }
 
 //回家
-  auto &state = planner.LoactaionCloseControl({-0.15, 0, 0}, 1.6, {0.01, 0.01, 0.02});
+  auto &state = planner.LoactaionCloseControl({0, 0, 0}, 1.6, {0.01, 0.01, 0.02});
   while (state.isResolved() == false)
   {
     vTaskDelay(50);
@@ -237,6 +241,8 @@ void once_loop(Map::MapInfo_t *map)
   ChassisControl.set_vel_target({0, 0, 0});
   //更新当前里程计
   kinematic.current_odom.x = map->odom.x - 0.45;
+	 kinematic.current_odom.y=map->odom.y;
+	ch040.setYawZero();
 //继续跑向实际目标
 state = planner.LoactaionCloseControl( map->odom, 1.3, {0.01, 0.005, 0.01});
 
@@ -254,45 +260,6 @@ state = planner.LoactaionCloseControl( map->odom, 1.3, {0.01, 0.005, 0.01});
   shootdown();
 }
 
-// void once_loop(Map::MapInfo_t *map)
-// {
-//   //第一次
-//   static bool first = true;
-
-//   Kinematic::odom_t odom = map->odom;
-//   if (first)
-//   {
-//   //后退一步
-//     odom.x -= 0.1;
-//     first = false;
-//   }
-
-//   //正常情况
-//   auto &state = planner.LoactaionCloseControl(odom, 1.3, {0.01, 0.005, 0.01});
-
-//   while (state.isResolved() == false)
-//   {
-//     vTaskDelay(50);
-//   }
-
-//   //对准y
-//   while (Gw_GrayscaleSensor.IsCurrentMode(GW_grasycalse::OutLine) == false)
-//   {
-//     ChassisControl.set_vel_target({0.15, Gw_GrayscaleSensor.ReturnXControl(), 0});
-//     vTaskDelay(20);
-//   }
-//   ChassisControl.set_vel_target({0, 0, 0});
-//   //更新当前里程计
-//   kinematic.current_odom.x = map->odom.x + 0.15;
-//   // imu.setzeroyaw();
-//   //发射
-//   shoot_ready();
-//   ball_down();
-//   vTaskDelay(700);
-//   ball_up();
-//   vTaskDelay(700);
-//   shootdown();
-// }
 
 void ball_down()
 {
@@ -398,7 +365,7 @@ void OnKinematicUpdate(void *pvParameters)
   {
     uint16_t dt = (xTaskGetTickCount() - last_tick) % portMAX_DELAY;
     last_tick = xTaskGetTickCount();
-    ChassisControl.KinematicAndControlUpdate(dt, imu.getyaw());
+    ChassisControl.KinematicAndControlUpdate(dt, ch040.getYaw());
     vTaskDelay(13);
   }
 }
@@ -406,7 +373,7 @@ void OnKinematicUpdate(void *pvParameters)
 void MyHAL_UARTECallback()
 {
   HAL_UARTEx_ReceiveToIdle_DMA(host._huart, host._rx_buffer, 20);
-  HAL_UARTEx_ReceiveToIdle_IT(&huart3, imu.buffer, 100);
+  HAL_UARTEx_ReceiveToIdle_IT(&huart3, ch040_imu_buffer, 100);
 }
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
@@ -419,8 +386,9 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
   }
   else if (huart->Instance == USART3)
   {
-    imu.update();
-    HAL_UARTEx_ReceiveToIdle_DMA(&huart3, imu.buffer, 100);
+    // imu.update();
+    ch040.analyze_data(ch040_imu_buffer);
+    HAL_UARTEx_ReceiveToIdle_DMA(&huart3, ch040_imu_buffer, 100);
   }
 	
 	
@@ -430,8 +398,9 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
   if (huart->Instance == USART3)
   {
-    imu.update();
-    HAL_UART_Receive_DMA(&huart3, imu.buffer, 100);
+    // imu.update();
+     ch040.analyze_data(ch040_imu_buffer);
+    HAL_UART_Receive_DMA(&huart3, ch040_imu_buffer, 100);
   }
 }
 void WS2812_Refresh()

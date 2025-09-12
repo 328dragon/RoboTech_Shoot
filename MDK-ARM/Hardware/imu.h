@@ -18,41 +18,47 @@ namespace IMU
     {
     public:
         uint8_t buffer[100];
-        float getralval(uint8_t *data)
-        {
-            int16_t yaw = (data[1] << 8) | data[0];
-
-            // 将16位整数转换为角度，范围是-180到180度
-            float yawAngle = (yaw / 32768.0) * 3.1415926;
-            return yawAngle;
-        }
         void setzeroyaw()
         {
-            zero_yaw=getralval(Eular.yaw.data);
+            yaw_zero = yaw_raw; // 设置当前yaw为零点
         }
         float getyaw()
         {
-            return getralval(Eular.yaw.data)-zero_yaw;
+                  yaw= yaw_raw - yaw_zero; // 减去零点偏移
+            if (yaw < -3.1415926f)
+            {
+                yaw += 2 * 3.1415926f;
+            }
+            else if (yaw > 3.1415926f)
+            {
+                yaw -= 2 * 3.1415926f;
+            }
+            return yaw;
         }
         void update()
         {
             uint8_t *data = buffer;
-            if (data[0] == 0x55)
+             uint8_t data_length = data[2];
+            if (data_length == 76) // HI91浮点型数据输入
             {
-                switch (data[1])
-                {
-                case 0x53:
-                    Eular.roll.data[0] = data[2];
-                    Eular.roll.data[1] = data[3];
-                    Eular.pitch.data[0] = data[4];
-                    Eular.pitch.data[1] = data[5];
-                    Eular.yaw.data[0] = data[6];
-                    Eular.yaw.data[1] = data[7];
-                    break;
-                default:
-                    break;
-                }
+                memcpy(acc, &data[18], 12);
+                memcpy(gyr, &data[30], 12);
+                memcpy(mag, &data[42], 12);
+                memcpy(imu, &data[54], 12);
+                memcpy(quat, &data[66], 16);
             }
+            // 处理yaw线转化成弧度
+            yaw_raw= imu[2] * 3.1415926 / 180.0f;
+            // 进行归一化
+            if(yaw_raw<-3.1415926f)
+            {
+                yaw_raw += 2 * 3.1415926f;
+            }
+            else if(yaw_raw>3.1415926f)
+            {
+                yaw_raw -= 2 * 3.1415926f;
+            }
+            getYaw();
         }
         ImuEular_t Eular;
         float zero_yaw;

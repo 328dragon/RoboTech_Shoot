@@ -875,11 +875,6 @@
               <FilePath>.\Hardware\grasycalse_planner.h</FilePath>
             </File>
             <File>
-              <FileName>imu.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>.\Hardware\imu.h</FilePath>
-            </File>
-            <File>
               <FileName>WS2812_yx.cpp</FileName>
               <FileType>8</FileType>
               <FilePath>.\Hardware\WS2812_yx.cpp</FilePath>
