@@ -216,9 +216,10 @@ void gray_read_task(void *pvParameters)
 
 void once_loop(Map::MapInfo_t *map)
 {
-  //目标值先减少一段距离(30框的一半+15车身一半+10预留校准跑道)
+
+  //目标值先减少一段距离(30框的一半+15车身一半+15预留校准跑道)
 	 Kinematic::odom_t odom = map->odom;
-   odom.x -= 0.55;
+   odom.x -= 0.6;
   //正常情况
   auto &state = planner.LoactaionCloseControl(odom, 1.3, {0.01, 0.005, 0.01});
 
@@ -237,9 +238,9 @@ void once_loop(Map::MapInfo_t *map)
   //更新当前里程计
   kinematic.current_odom.x = map->odom.x - 0.45;
 //继续跑向实际目标
-auto &another_state = planner.LoactaionCloseControl( map->odom, 1.3, {0.01, 0.005, 0.01});
+state = planner.LoactaionCloseControl( map->odom, 1.3, {0.01, 0.005, 0.01});
 
-  while (another_state.isResolved() == false)
+  while (state.isResolved() == false)
   {
     vTaskDelay(50);
   }
