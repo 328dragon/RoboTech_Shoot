@@ -1,1 +1,9 @@
 # ROBOTECH
+
+  SHOOT
+TIM4 TIM2 
+
+
+
+TIM1 TIM3 
+

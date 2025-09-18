@@ -147,7 +147,7 @@ int main(void)
   MX_UART4_Init();
   MX_UART5_Init();
   /* USER CODE BEGIN 2 */
-	HAL_Delay(4000);
+	HAL_Delay(6000);
   main_cpp();
   /* USER CODE END 2 */
 

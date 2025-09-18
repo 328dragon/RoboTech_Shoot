@@ -237,13 +237,13 @@ void once_loop(Map::MapInfo_t *map)
   while (Gw_GrayscaleSensor.IsCurrentMode(GW_grasycalse::OutLine))
   {
     ChassisControl.set_vel_target({0.15, Gw_GrayscaleSensor.ReturnXControl(), 0});
-    vTaskDelay(20);
+    vTaskDelay(20); 
   }
   ChassisControl.set_vel_target({0, 0, 0});
   //更新当前里程计
   kinematic.current_odom.x = map->odom.x - 0.45;
 	 kinematic.current_odom.y=map->odom.y;
-	ch040.setYawZero();
+//	ch040.setYawZero();
 //继续跑向实际目标
 state = planner.LoactaionCloseControl( map->odom, 1.3, {0.01, 0.005, 0.01});
 
@@ -268,7 +268,7 @@ void ball_down()
 }
 void ball_up()
 {
-  SoftSetAngle(soft_pwm_fire, 120);
+  SoftSetAngle(soft_pwm_fire, 170);
 }
 void shoot_ready()
 {
