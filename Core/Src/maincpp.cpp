@@ -223,10 +223,10 @@ void once_loop(Map::MapInfo_t *map)
 {
 
   //目标值先减少一段距离(30框的一半+15车身一半+15预留校准跑道)
-	 Kinematic::odom_t odom = map->odom;
+	 Kinematic::odom_t odom = map->odom;3
    odom.x -= 0.6;
   //正常情况
-  auto &state = planner.LoactaionCloseControl(odom, 1.3, {0.01, 0.005, 0.01});
+  auto &state = planner.LoactaionCloseControl(odom, 3, {0.01, 0.005, 0.01});
 
   while (state.isResolved() == false)
   {
@@ -245,7 +245,7 @@ void once_loop(Map::MapInfo_t *map)
 	 kinematic.current_odom.y=map->odom.y;
 //	ch040.setYawZero();
 //继续跑向实际目标
-state = planner.LoactaionCloseControl( map->odom, 1.3, {0.01, 0.005, 0.01});
+state = planner.LoactaionCloseControl( map->odom, 3, {0.01, 0.005, 0.01});
 
   while (state.isResolved() == false)
   {
@@ -257,7 +257,7 @@ state = planner.LoactaionCloseControl( map->odom, 1.3, {0.01, 0.005, 0.01});
   ball_down();
   vTaskDelay(700);
   ball_up();
-  vTaskDelay(700);
+  vTaskDelay(1200);
   shootdown();
 }
 
@@ -268,20 +268,23 @@ void ball_down()
 }
 void ball_up()
 {
-  SoftSetAngle(soft_pwm_fire, 170);
+  SoftSetAngle(soft_pwm_fire, 180);
 }
 void shoot_ready()
 {
   for (int i = 1; i < 3; i++)
   {
-    pwm[i].set_duty_cycle(6.85);
+//    pwm[i].set_duty_cycle(6.85);
+		 pwm[i].set_duty_cycle(5.85);
   }
 }
 void shootdown()
 {
   for (int i = 1; i < 3; i++)
   {
-    pwm[i].set_duty_cycle(5.8);
+//    pwm[i].set_duty_cycle(5.8);
+		
+		  pwm[i].set_duty_cycle(5.0);
   }
 }
 
