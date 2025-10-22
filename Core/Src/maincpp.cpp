@@ -151,7 +151,6 @@ void Onmaincpp(void *pvParameters)
 
   flaga = 1;
   vTaskDelay(100);
-//  imu.setzeroyaw();
 	ch040.setYawZero();
   vTaskDelay(100);
 //动作序列
@@ -172,20 +171,6 @@ void Onmaincpp(void *pvParameters)
     vTaskDelay(50);
   }
   flagb = 1;
-//   auto &state = planner.LoactaionCloseControl({-0.15, 0, 3.1415 / 2.0}, 1.6, {0.01, 0.01, 0.02});
-//   while (state.isResolved() == false)
-//   {
-//     vTaskDelay(50);
-//   }
-//   flagb = 1;
-
-// // 最终停下来
-//   while (Gw_GrayscaleSensor.IsCurrentMode(GW_grasycalse::OutLine) == false)
-//   {
-//     ChassisControl.set_vel_target({0.07, 0, Gw_GrayscaleSensor.ReturnCotorl()});
-//     vTaskDelay(20);
-//   }
-
   ChassisControl.set_vel_target({0, 0, 0});
 
   #else //debug模式
@@ -223,10 +208,10 @@ void once_loop(Map::MapInfo_t *map)
 {
 
   //目标值先减少一段距离(30框的一半+15车身一半+15预留校准跑道)
-	 Kinematic::odom_t odom = map->odom;3
+	 Kinematic::odom_t odom = map->odom;
    odom.x -= 0.6;
   //正常情况
-  auto &state = planner.LoactaionCloseControl(odom, 3, {0.01, 0.005, 0.01});
+  auto &state = planner.LoactaionCloseControl(odom, 6, {0.01, 0.005, 0.01});
 
   while (state.isResolved() == false)
   {
@@ -236,7 +221,7 @@ void once_loop(Map::MapInfo_t *map)
   //对准y,当全白时候停止
   while (Gw_GrayscaleSensor.IsCurrentMode(GW_grasycalse::OutLine))
   {
-    ChassisControl.set_vel_target({0.15, Gw_GrayscaleSensor.ReturnXControl(), 0});
+    ChassisControl.set_vel_target({0.3, Gw_GrayscaleSensor.ReturnXControl(), 0});
     vTaskDelay(20); 
   }
   ChassisControl.set_vel_target({0, 0, 0});
@@ -245,13 +230,12 @@ void once_loop(Map::MapInfo_t *map)
 	 kinematic.current_odom.y=map->odom.y;
 //	ch040.setYawZero();
 //继续跑向实际目标
-state = planner.LoactaionCloseControl( map->odom, 3, {0.01, 0.005, 0.01});
+state = planner.LoactaionCloseControl( map->odom, 4, {0.01, 0.005, 0.01});
 
   while (state.isResolved() == false)
   {
     vTaskDelay(50);
   }
-  // imu.setzeroyaw();
   //发射,不用改
   shoot_ready();
   ball_down();
@@ -275,7 +259,7 @@ void shoot_ready()
   for (int i = 1; i < 3; i++)
   {
 //    pwm[i].set_duty_cycle(6.85);
-		 pwm[i].set_duty_cycle(5.85);
+		 pwm[i].set_duty_cycle(6.85);//5.85到6.85
   }
 }
 void shootdown()
@@ -284,7 +268,7 @@ void shootdown()
   {
 //    pwm[i].set_duty_cycle(5.8);
 		
-		  pwm[i].set_duty_cycle(5.0);
+		  pwm[i].set_duty_cycle(5.8);
   }
 }
 
