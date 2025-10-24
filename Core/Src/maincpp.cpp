@@ -218,17 +218,20 @@ void once_loop(Map::MapInfo_t *map)
     vTaskDelay(50);
   }
 
+	
   //对准y,当全白时候停止
   while (Gw_GrayscaleSensor.IsCurrentMode(GW_grasycalse::OutLine))
   {
     ChassisControl.set_vel_target({0.15, Gw_GrayscaleSensor.ReturnXControl(), 0});
     vTaskDelay(20); 
   }
+	 vTaskDelay(50); 
   ChassisControl.set_vel_target({0, 0, 0});
   //更新当前里程计
   kinematic.current_odom.x = map->odom.x - 0.45;
 	 kinematic.current_odom.y=map->odom.y;
 	kinematic.current_odom.yaw=map->odom.yaw;
+ vTaskDelay(50);
 //	ch040.setYawZero();
 //继续跑向实际目标
 state = planner.LoactaionCloseControl( map->odom, 3, {0.01, 0.005, 0.01});
@@ -261,7 +264,7 @@ void shoot_ready()
   for (int i = 1; i < 3; i++)
   {
 //    pwm[i].set_duty_cycle(6.85);
-		 pwm[i].set_duty_cycle(6.85);//5.85到6.85
+		 pwm[i].set_duty_cycle(6.95);//5.85到6.85
   }
 }
 void shootdown()
