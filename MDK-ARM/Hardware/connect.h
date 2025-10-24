@@ -86,7 +86,7 @@ namespace Connect
                 _planner->LoactaionCloseControl({speed[0], speed[1], speed[2]}, 0.8, {0.01, 0.01, 0.02}, false);
                 // _controller->SetClosePosition({speed[0], speed[1], speed[2]}, {0.01, 0.01, 0.02});
             }
-            else if(data[0]==0xEC && data[2]==0XCE)
+            else if(data[0]==0xCE && data[2]==0XCE)
             {
                 task_id=(int)data[1];
             }

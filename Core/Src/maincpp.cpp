@@ -149,7 +149,6 @@ void Onmaincpp(void *pvParameters)
  }
   choice_task(host.task_id);
 
-  flaga = 1;
   vTaskDelay(100);
 	ch040.setYawZero();
   vTaskDelay(100);
@@ -170,9 +169,9 @@ void Onmaincpp(void *pvParameters)
   {
     vTaskDelay(50);
   }
-  flagb = 1;
-  ChassisControl.set_vel_target({0, 0, 0});
 
+  ChassisControl.set_vel_target({0, 0, 0});
+   flaga = 1;
   #else //debug模式
 //	ChassisControl.set_vel_target({0, 0,0.5});
 //auto &state = planner.LoactaionCloseControl({0, 0,0},0.8, {0.01, 0.01, 0.02});
@@ -185,7 +184,7 @@ void Onmaincpp(void *pvParameters)
 
   while (1)
   {
-		  SoftSetAngle(soft_pwm_fire, debug_fire_ball);
+		  // SoftSetAngle(soft_pwm_fire, debug_fire_ball);
     vTaskDelay(100);
   }
 }
@@ -243,7 +242,7 @@ state = planner.LoactaionCloseControl( map->odom, 3, {0.01, 0.005, 0.01});
   ball_down();
   vTaskDelay(700);
   ball_up();
-  vTaskDelay(1200);
+  vTaskDelay(1600);
   shootdown();
 	loop_time++;
 }
@@ -395,7 +394,10 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 }
 void WS2812_Refresh()
 {
+	if(flaga==1)
   HAL_SPI_Transmit_DMA(&hspi3, (uint8_t *)WS2812buf2send, 24 * (LED_Nums + 1));
+
+		
 }
 extern "C"
 {
