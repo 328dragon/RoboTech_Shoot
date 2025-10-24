@@ -31,6 +31,7 @@ namespace Connect
             _huart = huart;
             _planner = planner;
             HAL_UARTEx_ReceiveToIdle_DMA(_huart, _rx_buffer, 20);
+					__HAL_DMA_DISABLE_IT(_huart->hdmarx,DMA_IT_HT);
         }
         /// @brief
         /// @param data

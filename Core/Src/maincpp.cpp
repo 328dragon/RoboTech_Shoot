@@ -64,6 +64,7 @@ void shoot_ready();
 void shootdown();
 void once_loop(Map::MapInfo_t *map);
 int debug_fire_ball=0;
+int loop_time=0;
 // 现在有三种控制方法
 /*一是基于自身坐标系下的速度闭环*/
 /*二是基于大地坐标系下的速度闭环*/
@@ -142,11 +143,10 @@ void Onmaincpp(void *pvParameters)
 {
   #ifndef debug_chassis
     
-//  while (host.task_id == -1)
-//  {
-//    vTaskDelay(100);
-//  }
-  host.task_id=0;//测试用
+ while (host.task_id == -1)
+ {
+  vTaskDelay(100);
+ }
   choice_task(host.task_id);
 
   flaga = 1;
@@ -210,6 +210,7 @@ void once_loop(Map::MapInfo_t *map)
   //目标值先减少一段距离(30框的一半+15车身一半+15预留校准跑道)
 	 Kinematic::odom_t odom = map->odom;
    odom.x -= 0.6;
+	odom.yaw+=((loop_time==0)?0:1)*0.016;
   //正常情况
   auto &state = planner.LoactaionCloseControl(odom, 6, {0.01, 0.005, 0.01});
 
@@ -221,16 +222,17 @@ void once_loop(Map::MapInfo_t *map)
   //对准y,当全白时候停止
   while (Gw_GrayscaleSensor.IsCurrentMode(GW_grasycalse::OutLine))
   {
-    ChassisControl.set_vel_target({0.3, Gw_GrayscaleSensor.ReturnXControl(), 0});
+    ChassisControl.set_vel_target({0.15, Gw_GrayscaleSensor.ReturnXControl(), 0});
     vTaskDelay(20); 
   }
   ChassisControl.set_vel_target({0, 0, 0});
   //更新当前里程计
   kinematic.current_odom.x = map->odom.x - 0.45;
 	 kinematic.current_odom.y=map->odom.y;
+	kinematic.current_odom.yaw=map->odom.yaw;
 //	ch040.setYawZero();
 //继续跑向实际目标
-state = planner.LoactaionCloseControl( map->odom, 4, {0.01, 0.005, 0.01});
+state = planner.LoactaionCloseControl( map->odom, 3, {0.01, 0.005, 0.01});
 
   while (state.isResolved() == false)
   {
@@ -243,6 +245,7 @@ state = planner.LoactaionCloseControl( map->odom, 4, {0.01, 0.005, 0.01});
   ball_up();
   vTaskDelay(1200);
   shootdown();
+	loop_time++;
 }
 
 
@@ -365,12 +368,11 @@ void MyHAL_UARTECallback()
 }
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
-  // if (huart->Instance == USART2 && __HAL_UART_GET_FLAG(&huart2, UART_FLAG_IDLE))
-	
-	
   if (huart->Instance == UART4)
   {
-    host.Data_Analyse(host._rx_buffer);
+    host.Data_Analyse(host._rx_buffer);	
+		 HAL_UARTEx_ReceiveToIdle_DMA(host._huart, host._rx_buffer, 20);
+		__HAL_DMA_DISABLE_IT(host._huart->hdmarx,DMA_IT_HT);
   }
   else if (huart->Instance == USART3)
   {
