@@ -208,7 +208,7 @@ void once_loop(Map::MapInfo_t *map)
 
   //目标值先减少一段距离(30框的一半+15车身一半+15预留校准跑道)
 	 Kinematic::odom_t odom = map->odom;
-   odom.x -= 0.6;
+   odom.x -= 0.75;	 
 	odom.yaw+=((loop_time==0)?0:1)*0.016;
   //正常情况
   auto &state = planner.LoactaionCloseControl(odom, 6, {0.01, 0.005, 0.01});
@@ -217,15 +217,26 @@ void once_loop(Map::MapInfo_t *map)
   {
     vTaskDelay(50);
   }
+while(!(Gw_GrayscaleSensor.data[3]==1&&Gw_GrayscaleSensor.data[4]==1&&Gw_GrayscaleSensor.data[5]==1))
+{
+ChassisControl.set_vel_target({0.15, Gw_GrayscaleSensor.ReturnXControl(), 0});
+if(!Gw_GrayscaleSensor.IsCurrentMode(GW_grasycalse::OutLine))
+{
+break;
+}
+ vTaskDelay(20); 
 
+
+}
+vTaskDelay(20); 
 	
-  //对准y,当全白时候停止
+//  //对准y,当全白时候停止
   while (Gw_GrayscaleSensor.IsCurrentMode(GW_grasycalse::OutLine))
-  {
-    ChassisControl.set_vel_target({0.15, Gw_GrayscaleSensor.ReturnXControl(), 0});
+ {
+    ChassisControl.set_vel_target({0.15,0, 0});
     vTaskDelay(20); 
   }
-	 vTaskDelay(50); 
+//	 vTaskDelay(50); 
   ChassisControl.set_vel_target({0, 0, 0});
   //更新当前里程计
   kinematic.current_odom.x = map->odom.x - 0.45;
